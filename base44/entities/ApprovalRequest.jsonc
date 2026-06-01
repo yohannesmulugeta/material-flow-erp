@@ -1,0 +1,61 @@
+{
+  "name": "ApprovalRequest",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "transfer",
+        "return",
+        "damage",
+        "stock_adjustment",
+        "payment_edit",
+        "payment_delete",
+        "record_delete"
+      ],
+      "description": "Type of approval request"
+    },
+    "reference_id": {
+      "type": "string",
+      "description": "ID of the record needing approval"
+    },
+    "reference_type": {
+      "type": "string",
+      "description": "Entity type (Transfer, Payment, etc.)"
+    },
+    "reference_label": {
+      "type": "string",
+      "description": "Human-readable label for the record"
+    },
+    "requested_by": {
+      "type": "string"
+    },
+    "requested_by_id": {
+      "type": "string"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "string",
+      "description": "JSON payload of changes requested"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "type",
+    "reference_id",
+    "reference_type"
+  ]
+}

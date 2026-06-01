@@ -1,0 +1,52 @@
+{
+  "name": "DamageRecord",
+  "type": "object",
+  "properties": {
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "warehouse_id": {
+      "type": "string"
+    },
+    "warehouse_name": {
+      "type": "string"
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "damage",
+        "loss"
+      ],
+      "default": "damage"
+    },
+    "recorded_by": {
+      "type": "string"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "product_id",
+    "warehouse_id",
+    "quantity"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "ContainerItem",
+  "type": "object",
+  "properties": {
+    "container_id": {
+      "type": "string",
+      "description": "Reference to Container"
+    },
+    "product_id": {
+      "type": "string",
+      "description": "Reference to Product"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "unit_cost_usd": {
+      "type": "number",
+      "description": "Per unit cost in USD"
+    },
+    "total_cost_usd": {
+      "type": "number"
+    },
+    "landed_cost_per_unit_etb": {
+      "type": "number",
+      "description": "Calculated landed cost per unit in ETB"
+    },
+    "total_landed_cost_etb": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "container_id",
+    "product_id",
+    "quantity"
+  ]
+}

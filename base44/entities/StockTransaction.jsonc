@@ -1,0 +1,65 @@
+{
+  "name": "StockTransaction",
+  "type": "object",
+  "properties": {
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "warehouse_id": {
+      "type": "string"
+    },
+    "warehouse_name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "stock_in",
+        "stock_out"
+      ],
+      "description": "Direction of stock movement"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "container_receiving",
+        "purchase",
+        "return",
+        "adjustment",
+        "sale",
+        "transfer_out",
+        "transfer_in",
+        "damage",
+        "loss"
+      ],
+      "description": "Reason for stock movement"
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "unit_cost_etb": {
+      "type": "number",
+      "description": "Cost per unit at time of transaction"
+    },
+    "reference_id": {
+      "type": "string",
+      "description": "Reference to source document (container_id, sale_id, transfer_id, etc.)"
+    },
+    "reference_type": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "product_id",
+    "warehouse_id",
+    "type",
+    "reason",
+    "quantity"
+  ]
+}

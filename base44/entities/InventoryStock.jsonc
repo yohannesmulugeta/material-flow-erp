@@ -1,0 +1,36 @@
+{
+  "name": "InventoryStock",
+  "type": "object",
+  "properties": {
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "warehouse_id": {
+      "type": "string"
+    },
+    "warehouse_name": {
+      "type": "string"
+    },
+    "quantity": {
+      "type": "number",
+      "default": 0,
+      "description": "Current stock quantity"
+    },
+    "avg_cost_etb": {
+      "type": "number",
+      "default": 0,
+      "description": "Average cost per unit in ETB"
+    },
+    "total_value_etb": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "product_id",
+    "warehouse_id"
+  ]
+}

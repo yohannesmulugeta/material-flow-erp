@@ -1,0 +1,36 @@
+{
+  "name": "ActivityLog",
+  "type": "object",
+  "properties": {
+    "user_name": {
+      "type": "string"
+    },
+    "module": {
+      "type": "string",
+      "description": "Module name (Product, Sale, Transfer, etc.)"
+    },
+    "action": {
+      "type": "string",
+      "description": "Action performed (created, updated, deleted, etc.)"
+    },
+    "entity_type": {
+      "type": "string"
+    },
+    "entity_id": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "previous_value": {
+      "type": "string"
+    },
+    "new_value": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "module",
+    "action"
+  ]
+}

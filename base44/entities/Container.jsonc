@@ -1,0 +1,87 @@
+{
+  "name": "Container",
+  "type": "object",
+  "properties": {
+    "container_number": {
+      "type": "string",
+      "description": "Unique container identifier"
+    },
+    "supplier_id": {
+      "type": "string",
+      "description": "Reference to Supplier"
+    },
+    "supplier_name": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    },
+    "arrival_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "currency": {
+      "type": "string",
+      "default": "USD"
+    },
+    "exchange_rate": {
+      "type": "number",
+      "description": "USD to ETB exchange rate at time of import"
+    },
+    "freight_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "insurance_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "customs_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "transport_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "loading_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "unloading_cost": {
+      "type": "number",
+      "default": 0
+    },
+    "other_costs": {
+      "type": "number",
+      "default": 0
+    },
+    "total_product_cost_usd": {
+      "type": "number",
+      "default": 0
+    },
+    "total_import_cost_etb": {
+      "type": "number",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "in_transit",
+        "arrived",
+        "received",
+        "closed"
+      ],
+      "default": "in_transit"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "receiving_warehouse_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "container_number"
+  ]
+}

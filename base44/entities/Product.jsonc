@@ -1,0 +1,69 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Product name"
+    },
+    "sku": {
+      "type": "string",
+      "description": "Stock Keeping Unit (must be unique)"
+    },
+    "category_id": {
+      "type": "string",
+      "description": "Reference to ProductCategory"
+    },
+    "brand": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unit of measurement (pcs, kg, m, etc.)"
+    },
+    "description": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "discontinued"
+      ],
+      "default": "active"
+    },
+    "min_stock_level": {
+      "type": "number",
+      "default": 0,
+      "description": "Minimum stock level for low stock alert"
+    },
+    "max_stock_level": {
+      "type": "number",
+      "default": 0,
+      "description": "Maximum stock level"
+    },
+    "reorder_level": {
+      "type": "number",
+      "default": 0,
+      "description": "Level at which to reorder"
+    },
+    "preferred_warehouse_id": {
+      "type": "string",
+      "description": "Preferred warehouse for this product"
+    },
+    "default_selling_price": {
+      "type": "number",
+      "default": 0
+    },
+    "tax_rate": {
+      "type": "number",
+      "default": 0,
+      "description": "Tax rate percentage"
+    }
+  },
+  "required": [
+    "name",
+    "sku"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "name": "Transfer",
+  "type": "object",
+  "properties": {
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "source_warehouse_id": {
+      "type": "string"
+    },
+    "source_warehouse_name": {
+      "type": "string"
+    },
+    "destination_warehouse_id": {
+      "type": "string"
+    },
+    "destination_warehouse_name": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "requested_by": {
+      "type": "string"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "completed",
+        "cancelled"
+      ],
+      "default": "pending"
+    },
+    "transfer_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "product_id",
+    "quantity",
+    "source_warehouse_id",
+    "destination_warehouse_id"
+  ]
+}

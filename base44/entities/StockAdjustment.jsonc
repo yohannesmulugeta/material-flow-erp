@@ -1,0 +1,53 @@
+{
+  "name": "StockAdjustment",
+  "type": "object",
+  "properties": {
+    "product_id": {
+      "type": "string"
+    },
+    "product_name": {
+      "type": "string"
+    },
+    "warehouse_id": {
+      "type": "string"
+    },
+    "warehouse_name": {
+      "type": "string"
+    },
+    "system_quantity": {
+      "type": "number",
+      "description": "Quantity in system before adjustment"
+    },
+    "actual_quantity": {
+      "type": "number",
+      "description": "Physical count quantity"
+    },
+    "difference": {
+      "type": "number",
+      "description": "actual - system"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "requested_by": {
+      "type": "string"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "product_id",
+    "warehouse_id",
+    "actual_quantity"
+  ]
+}

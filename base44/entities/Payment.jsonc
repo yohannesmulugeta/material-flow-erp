@@ -1,0 +1,57 @@
+{
+  "name": "Payment",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "customer_payment",
+        "supplier_payment"
+      ],
+      "description": "Payment type"
+    },
+    "reference_id": {
+      "type": "string",
+      "description": "Customer or Supplier ID"
+    },
+    "reference_name": {
+      "type": "string"
+    },
+    "sale_id": {
+      "type": "string",
+      "description": "Optional reference to specific sale"
+    },
+    "amount": {
+      "type": "number"
+    },
+    "payment_method": {
+      "type": "string"
+    },
+    "account_id": {
+      "type": "string"
+    },
+    "account_name": {
+      "type": "string"
+    },
+    "payment_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "cancelled"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "type",
+    "reference_id",
+    "amount"
+  ]
+}
