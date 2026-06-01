@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, DEMO_MODE } from '@/api/supabaseClient';
 
 // Cache the last-good profile in localStorage so reloads while offline don't
@@ -58,18 +58,21 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // Use a ref so the timeout callback can check if auth completed
+  // without capturing stale closure state.
+  const authDoneRef = useRef(false);
+
   useEffect(() => {
     let mounted = true;
 
-    // Safety timeout — if Supabase never responds (wrong URL / no network)
-    // unblock the UI after 8 seconds so the user sees an error instead of a spinner.
+    // Safety timeout — fires only if auth never completes (wrong URL / no network).
     const timeout = setTimeout(() => {
-      if (mounted && !authChecked) {
+      if (mounted && !authDoneRef.current) {
         setIsLoadingAuth(false);
         setAuthChecked(true);
-        setAuthError({ type: 'timeout', message: 'Could not connect to the server. Check your internet connection.' });
+        setAuthError({ type: 'timeout', message: 'Could not connect to Supabase. Check your .env.local file and restart the dev server.' });
       }
-    }, 8000);
+    }, 10000);
 
     (async () => {
       try {
@@ -100,6 +103,7 @@ export const AuthProvider = ({ children }) => {
       } catch (e) {
         if (mounted) setAuthError({ type: 'unknown', message: e?.message || 'Auth init failed' });
       } finally {
+        authDoneRef.current = true; // tell the timeout: auth completed, don't fire
         if (mounted) {
           setIsLoadingAuth(false);
           setAuthChecked(true);
