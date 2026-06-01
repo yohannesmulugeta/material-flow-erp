@@ -65,19 +65,28 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let mounted = true;
 
-    // Safety timeout — fires only if auth never completes (wrong URL / no network).
-    const timeout = setTimeout(() => {
-      if (mounted && !authDoneRef.current) {
-        setIsLoadingAuth(false);
-        setAuthChecked(true);
-        setAuthError({ type: 'timeout', message: 'Could not connect to Supabase. Check your .env.local file and restart the dev server.' });
-      }
-    }, 10000);
+    // No outer timeout needed — getSession() itself races against 5s internally.
 
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        // Race getSession() against a 5-second timeout.
+        // If it hangs (stale/corrupt localStorage token trying to refresh),
+        // treat it as "no session" and send the user to login.
+        const sessionRace = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ data: { session: null }, timedOut: true }), 5000)
+          ),
+        ]);
+
         if (!mounted) return;
+
+        if (sessionRace.timedOut) {
+          // Clear any corrupt token so next load is clean
+          await supabase.auth.signOut().catch(() => {});
+        }
+
+        const { data } = sessionRace;
         const sess = data?.session || null;
         setSession(sess);
         setUser(sess?.user || null);
@@ -124,7 +133,6 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       mounted = false;
-      clearTimeout(timeout);
       sub?.subscription?.unsubscribe?.();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
