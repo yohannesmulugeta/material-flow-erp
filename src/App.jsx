@@ -29,6 +29,7 @@ import Reports from '@/pages/Reports';
 import ActivityLog from '@/pages/ActivityLog';
 import Approvals from '@/pages/Approvals';
 import StockAdjustments from '@/pages/StockAdjustments';
+import DataAudit from '@/pages/DataAudit';
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
                 <Route path="/activity-log" element={<ActivityLog />} />
                 <Route path="/approvals" element={<Approvals />} />
                 <Route path="/stock-adjustments" element={<StockAdjustments />} />
+              <Route path="/data-audit" element={<DataAudit />} />
               </Route>
             </Route>
 

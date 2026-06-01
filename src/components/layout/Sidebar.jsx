@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Package, Warehouse, Ship, ShoppingCart,
   Users, Truck, ArrowLeftRight, AlertTriangle, Undo2,
   CreditCard, Building2, FileText, Activity, CheckSquare, SlidersHorizontal,
-  ChevronLeft, ChevronRight, LogOut, Moon, Sun, Menu, X
+  ChevronLeft, ChevronRight, LogOut, Moon, Sun, Menu, X, ShieldCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { path: '/approvals', label: 'Approvals', icon: CheckSquare, module: 'activity_log' },
   { path: '/stock-adjustments', label: 'Stock Adjustments', icon: SlidersHorizontal, module: 'inventory' },
   { path: '/activity-log', label: 'Activity Log', icon: Activity, module: 'activity_log' },
+  { path: '/data-audit', label: 'Data Audit', icon: ShieldCheck, module: 'reports' },
 ];
 
 export default function Sidebar({ user, theme, toggleTheme, onLogout }) {

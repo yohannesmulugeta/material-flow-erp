@@ -17,8 +17,12 @@ export default defineConfig({
           supabase: ['@supabase/supabase-js'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-tabs'],
           charts: ['recharts'],
+          excel: ['exceljs'],
+          pdf: ['jspdf', 'jspdf-autotable'],
+          xlsx: ['xlsx'],
         },
       },
     },
+    chunkSizeWarningLimit: 2500,
   },
 })
