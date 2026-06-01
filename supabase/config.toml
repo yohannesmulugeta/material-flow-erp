@@ -46,3 +46,6 @@ verify_jwt = true
 
 [functions.notify-transfer-requested]
 verify_jwt = true
+
+[functions.notify-approval-needed]
+verify_jwt = true
