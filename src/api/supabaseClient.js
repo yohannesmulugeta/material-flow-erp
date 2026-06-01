@@ -29,8 +29,7 @@ export const supabase = createClient(SUPABASE_URL ?? 'http://invalid', SUPABASE_
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
+    detectSessionInUrl: false,  // pkce flow was hanging on every page load
   },
 });
 

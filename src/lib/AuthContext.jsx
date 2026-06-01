@@ -35,26 +35,28 @@ export const AuthProvider = ({ children }) => {
   const refreshProfile = useCallback(async (uid) => {
     if (!uid) return null;
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', uid)
-        .single();
+      // Race the DB call against 4 seconds — if it hangs, fall back to cache.
+      const result = await Promise.race([
+        supabase.from('profiles').select('*').eq('id', uid).single(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('profile_timeout')), 4000)),
+      ]);
+      const { data, error } = result;
       if (error) throw error;
       setProfile(data);
       writeCachedProfile({ id: data.id, email: data.email, role: data.role, full_name: data.full_name, status: data.status });
       return data;
     } catch (e) {
-      // Offline / 401 — fall back to cache so an admin reload doesn't
-      // demote them to "Pending Approval" until network returns.
+      // Offline / slow / 401 — fall back to cache so admins aren't bounced.
       const cached = readCachedProfile();
       if (cached && cached.id === uid) {
         setProfile(cached);
         return cached;
       }
       // eslint-disable-next-line no-console
-      console.warn('[Auth] could not load profile', e?.message);
-      return null;
+      console.warn('[Auth] could not load profile:', e?.message);
+      // Return minimal profile so the app can still render (will show Pending Approval
+      // until next successful load, which is safe).
+      return { id: uid, role: 'unassigned' };
     }
   }, []);
 
