@@ -61,6 +61,16 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let mounted = true;
 
+    // Safety timeout — if Supabase never responds (wrong URL / no network)
+    // unblock the UI after 8 seconds so the user sees an error instead of a spinner.
+    const timeout = setTimeout(() => {
+      if (mounted && !authChecked) {
+        setIsLoadingAuth(false);
+        setAuthChecked(true);
+        setAuthError({ type: 'timeout', message: 'Could not connect to the server. Check your internet connection.' });
+      }
+    }, 8000);
+
     (async () => {
       try {
         const { data } = await supabase.auth.getSession();
@@ -110,8 +120,10 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(timeout);
       sub?.subscription?.unsubscribe?.();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshProfile]);
 
   const logout = useCallback(async (shouldRedirect = true) => {
