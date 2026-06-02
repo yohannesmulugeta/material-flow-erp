@@ -14,7 +14,6 @@ export default function AppLayout() {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
-      {/* Sidebar */}
       <Sidebar
         user={user}
         theme={theme}
@@ -24,38 +23,21 @@ export default function AppLayout() {
 
       {/* Main column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* ── Top bar ─────────────────────────────────────────────────── */}
-        <header className="
-          h-14 border-b border-border bg-card/80 backdrop-blur-sm
-          flex items-center gap-3 px-4 lg:px-5
-          flex-shrink-0 z-30
-          /* Safe area for devices with notch */
-          pt-safe
-        ">
-          {/* Mobile: spacer for hamburger button */}
+        {/* Top bar (pt-safe handles notch) */}
+        <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center gap-3 px-4 lg:px-5 flex-shrink-0 z-30 pt-safe">
+          {/* spacer for mobile hamburger */}
           <div className="w-10 flex-shrink-0 lg:hidden" />
-
-          {/* Search — takes remaining space */}
           <div className="flex-1 min-w-0">
             <GlobalSearch />
           </div>
-
-          {/* Notifications */}
           <div className="flex-shrink-0">
             <NotificationCenter />
           </div>
         </header>
 
-        {/* ── Page content ────────────────────────────────────────────── */}
+        {/* Page content (pb-safe keeps content clear of home bar) */}
         <main className="flex-1 overflow-y-auto scroll-mobile">
-          <div className="
-            p-4 lg:p-6
-            /* Top: extra space on mobile for hamburger */
-            pt-4 lg:pt-6
-            /* Bottom safe area so content isn't hidden behind home bar */
-            pb-safe
-            max-w-screen-2xl mx-auto
-          ">
+          <div className="p-4 lg:p-6 pb-safe max-w-screen-2xl mx-auto">
             <ErrorBoundary key={location.pathname}>
               <Outlet context={{ user, theme }} />
             </ErrorBoundary>
