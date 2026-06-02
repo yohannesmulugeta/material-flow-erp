@@ -4,17 +4,20 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Pencil } from 'lucide-react';
+import { Plus, Pencil, Eye } from 'lucide-react';
 import PageHeader from '@/components/ui/PageHeader';
 import DataTable from '@/components/ui/DataTable';
 import StatusBadge from '@/components/ui/StatusBadge';
+import SupplierStatement from '@/components/suppliers/SupplierStatement';
 import { logActivity } from '@/lib/activityLogger';
 
 export default function Suppliers() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [form, setForm] = useState({ name: '', country: '', contact_person: '', phone: '', email: '', status: 'active' });
 
   const { data: suppliers = [], isLoading } = useQuery({ queryKey: ['suppliers'], queryFn: () => base44.entities.Supplier.list() });
@@ -42,15 +45,22 @@ export default function Suppliers() {
     { header: 'Phone', accessorKey: 'phone' },
     { header: 'Email', accessorKey: 'email' },
     { header: 'Status', cell: row => <StatusBadge status={row.status} /> },
-    { header: '', cell: row => <Button variant="ghost" size="icon" className="h-8 w-8" onClick={e => { e.stopPropagation(); openEdit(row); }}><Pencil className="w-3.5 h-3.5" /></Button> },
+    { header: 'Actions', cell: row => (
+      <div className="flex gap-1">
+        <Button variant="ghost" size="icon" className="h-8 w-8" title="View Statement" onClick={e => { e.stopPropagation(); setSelected(row); }}><Eye className="w-3.5 h-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit" onClick={e => { e.stopPropagation(); openEdit(row); }}><Pencil className="w-3.5 h-3.5" /></Button>
+      </div>
+    )},
   ];
+
+  if (selected) return <SupplierStatement supplier={selected} onBack={() => setSelected(null)} />;
 
   return (
     <div className="space-y-4">
       <PageHeader title="Suppliers" description="Manage your suppliers" actions={<Button onClick={openNew}><Plus className="w-4 h-4 mr-2" />Add Supplier</Button>} />
       <DataTable columns={columns} data={suppliers} isLoading={isLoading} />
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) setEditing(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{editing ? 'Edit Supplier' : 'New Supplier'}</DialogTitle></DialogHeader>
           <form onSubmit={e => { e.preventDefault(); save.mutate(form); }} className="space-y-4">
@@ -62,6 +72,13 @@ export default function Suppliers() {
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Phone</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
               <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent>
+              </Select>
             </div>
             <Button type="submit" className="w-full" disabled={save.isPending}>{save.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}</Button>
           </form>
