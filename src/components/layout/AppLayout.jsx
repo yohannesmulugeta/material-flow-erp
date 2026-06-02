@@ -1,14 +1,16 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { useTheme } from '@/lib/useTheme';
 import { useAuth } from '@/lib/AuthContext';
 import NotificationCenter from '@/components/NotificationCenter';
 import GlobalSearch from '@/components/GlobalSearch';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export default function AppLayout() {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const location = useLocation();
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
@@ -54,7 +56,9 @@ export default function AppLayout() {
             pb-safe
             max-w-screen-2xl mx-auto
           ">
-            <Outlet context={{ user, theme }} />
+            <ErrorBoundary key={location.pathname}>
+              <Outlet context={{ user, theme }} />
+            </ErrorBoundary>
           </div>
         </main>
       </div>
