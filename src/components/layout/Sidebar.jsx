@@ -105,7 +105,8 @@ export default function Sidebar({ user, theme, toggleTheme, onLogout }) {
       </div>
 
       {/* ── Navigation ────────────────────────────────────────────────── */}
-      <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto scroll-mobile">
+      {/* min-h-0 is REQUIRED for a flex child to scroll instead of overflowing */}
+      <nav className="flex-1 min-h-0 py-3 px-2 space-y-0.5 overflow-y-auto scroll-mobile">
         {visibleItems.map(item => <NavLink key={item.path} item={item} />)}
       </nav>
 

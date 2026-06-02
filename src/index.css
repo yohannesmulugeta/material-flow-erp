@@ -181,9 +181,9 @@
     transition: box-shadow 200ms var(--ease-out);
   }
 
-  /* Stagger children animation */
+  /* Stagger children animation — opt-in only, never global */
   .stagger > * {
-    animation: fade-up 400ms var(--spring) backwards;
+    animation: fade-up 400ms ease-out backwards;
   }
   .stagger > *:nth-child(1) { animation-delay: 0ms; }
   .stagger > *:nth-child(2) { animation-delay: 50ms; }
@@ -191,8 +191,6 @@
   .stagger > *:nth-child(4) { animation-delay: 150ms; }
   .stagger > *:nth-child(5) { animation-delay: 200ms; }
   .stagger > *:nth-child(6) { animation-delay: 250ms; }
-  .stagger > *:nth-child(7) { animation-delay: 300ms; }
-  .stagger > *:nth-child(8) { animation-delay: 350ms; }
 }
 
 /* ─── Keyframes ────────────────────────────────────────────────────────── */
@@ -329,5 +327,6 @@
 /* ─── Typography: tabular numbers everywhere they count ─────────────────── */
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
-/* ─── Page transition ───────────────────────────────────────────────────── */
-main > div > * { animation: fade-up 300ms var(--spring) both; }
+/* NOTE: no global page-transition animation — it left content stuck at
+   opacity:0 when the animation didn't fire. Pages opt into .animate-* per
+   element instead. */
