@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, ArrowLeftRight, Undo2, AlertTriangle, SlidersHorizontal } from 'lucide-react';
+import { Check, X, ArrowLeftRight, Undo2, AlertTriangle, SlidersHorizontal, CreditCard } from 'lucide-react';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { logActivity } from '@/lib/activityLogger';
@@ -37,9 +37,11 @@ export default function Approvals() {
   const { data: returns = [], isLoading: lr } = useQuery({ queryKey: ['returns'], queryFn: () => base44.entities.SalesReturn.filter({ status: 'pending' }) });
   const { data: damages = [], isLoading: ld } = useQuery({ queryKey: ['damages'], queryFn: () => base44.entities.DamageRecord.filter({ status: 'pending' }) });
   const { data: adjustments = [], isLoading: la } = useQuery({ queryKey: ['adjustments'], queryFn: () => base44.entities.StockAdjustment.filter({ status: 'pending' }) });
+  const { data: paymentRequests = [] } = useQuery({ queryKey: ['payment-approvals'], queryFn: () => base44.entities.ApprovalRequest.filter({ status: 'pending' }) });
   const { data: inventory = [] } = useQuery({ queryKey: ['inventory'], queryFn: () => base44.entities.InventoryStock.list() });
 
-  const totalPending = transfers.length + returns.length + damages.length + adjustments.length;
+  const pendingPaymentReqs = paymentRequests.filter(r => r.type === 'payment_edit' || r.type === 'payment_delete');
+  const totalPending = transfers.length + returns.length + damages.length + adjustments.length + pendingPaymentReqs.length;
 
   // Transfer approval
   const approveTransfer = useMutation({
@@ -138,6 +140,31 @@ export default function Approvals() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['adjustments'] })
   });
 
+  // Payment edit/delete approval
+  const approvePaymentRequest = useMutation({
+    mutationFn: async (req) => {
+      if (req.type === 'payment_edit') {
+        let payload = {};
+        try { payload = JSON.parse(req.payload || '{}'); } catch {}
+        await base44.entities.Payment.update(req.reference_id, payload);
+        await logActivity({ module: 'Payment', action: 'edit_approved', entityType: 'Payment', entityId: req.reference_id, description: `Approved edit for: ${req.reference_label}` });
+      } else if (req.type === 'payment_delete') {
+        await base44.entities.Payment.update(req.reference_id, { status: 'cancelled', archived: true, archived_at: new Date().toISOString() });
+        await logActivity({ module: 'Payment', action: 'delete_approved', entityType: 'Payment', entityId: req.reference_id, description: `Approved deletion of: ${req.reference_label}` });
+      }
+      await base44.entities.ApprovalRequest.update(req.id, { status: 'approved' });
+    },
+    onSuccess: () => qc.invalidateQueries()
+  });
+
+  const rejectPaymentRequest = useMutation({
+    mutationFn: async (req) => {
+      await base44.entities.ApprovalRequest.update(req.id, { status: 'rejected' });
+      await logActivity({ module: 'Payment', action: 'request_rejected', entityType: 'ApprovalRequest', entityId: req.id, description: `Rejected ${req.type}: ${req.reference_label}` });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payment-approvals'] })
+  });
+
   const tab = (label, icon, count) => (
     <TabsTrigger value={label} className="gap-1.5">
       {icon}
@@ -155,11 +182,12 @@ export default function Approvals() {
       />
 
       <Tabs defaultValue="Transfers">
-        <TabsList className="w-full">
+        <TabsList className="w-full flex-wrap">
           {tab('Transfers', <ArrowLeftRight className="w-3.5 h-3.5" />, transfers.length)}
           {tab('Returns', <Undo2 className="w-3.5 h-3.5" />, returns.length)}
           {tab('Damages', <AlertTriangle className="w-3.5 h-3.5" />, damages.length)}
           {tab('Adjustments', <SlidersHorizontal className="w-3.5 h-3.5" />, adjustments.length)}
+          {tab('Payments', <CreditCard className="w-3.5 h-3.5" />, pendingPaymentReqs.length)}
         </TabsList>
 
         <TabsContent value="Transfers">
@@ -221,6 +249,24 @@ export default function Approvals() {
                 onApprove={() => approveAdjustment.mutate(a)}
                 onReject={() => rejectAdjustment.mutate(a)}
                 loading={approveAdjustment.isPending || rejectAdjustment.isPending}
+              />
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="Payments">
+          <div className="bg-card rounded-xl border border-border p-4">
+            <h3 className="text-sm font-semibold mb-3">Pending Payment Requests</h3>
+            {pendingPaymentReqs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No pending payment requests</p>
+            ) : pendingPaymentReqs.map(req => (
+              <ApprovalRow key={req.id}
+                label={`${req.type === 'payment_edit' ? '✏️ Edit' : '🗑️ Delete'}: ${req.reference_label}`}
+                detail={`Requested by: ${req.requested_by}${req.notes ? ` · ${req.notes}` : ''}`}
+                date={req.created_date}
+                onApprove={() => approvePaymentRequest.mutate(req)}
+                onReject={() => rejectPaymentRequest.mutate(req)}
+                loading={approvePaymentRequest.isPending || rejectPaymentRequest.isPending}
               />
             ))}
           </div>

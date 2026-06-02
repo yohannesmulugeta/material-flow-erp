@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { Package, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Package, TrendingDown, TrendingUp, AlertTriangle, Reorder } from 'lucide-react';
+import AuditTrail from '@/components/ui/AuditTrail';
 import { format } from 'date-fns';
 
 export default function ProductStockDetail({ product, inventoryRows, categories, open, onClose }) {
@@ -123,6 +124,8 @@ export default function ProductStockDetail({ product, inventoryRows, categories,
               </div>
             )}
           </div>
+          {/* Audit Trail */}
+          <AuditTrail record={product} />
         </div>
       </SheetContent>
     </Sheet>
