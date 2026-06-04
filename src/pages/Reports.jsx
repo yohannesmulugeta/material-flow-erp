@@ -24,10 +24,19 @@ const REPORT_GROUPS = [
   ]},
   { group: 'Inventory', reports: [
     { value: 'stock_balance', label: 'Stock Balance Report' },
+    { value: 'variant_stock', label: 'Product Variant Stock' },
     { value: 'warehouse_stock', label: 'Warehouse Stock Report' },
+    { value: 'reserved_stock', label: 'Reserved Stock Report' },
+    { value: 'available_stock', label: 'Available Stock Report' },
     { value: 'inventory_valuation', label: 'Inventory Valuation' },
     { value: 'inventory_movement', label: 'Inventory Movement' },
     { value: 'low_stock', label: 'Low Stock Report' },
+    { value: 'dead_stock', label: 'Dead Stock Report' },
+    { value: 'stock_aging', label: 'Stock Aging Report' },
+  ]},
+  { group: 'Warehouse / Release', reports: [
+    { value: 'warehouse_release', label: 'Warehouse Release Report' },
+    { value: 'sales_release', label: 'Sales Release Report' },
   ]},
   { group: 'Credit', reports: [
     { value: 'customer_credit', label: 'Customer Credit Summary' },
@@ -35,6 +44,7 @@ const REPORT_GROUPS = [
   ]},
   { group: 'Profit', reports: [
     { value: 'product_profit', label: 'Product Profitability' },
+    { value: 'loss_making', label: 'Loss-Making Products' },
     { value: 'monthly_profit', label: 'Monthly Profit' },
   ]},
   { group: 'Warehouse', reports: [
@@ -63,6 +73,8 @@ export default function Reports() {
   const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: () => base44.entities.Product.list() });
   const { data: transfers = [] } = useQuery({ queryKey: ['transfers'], queryFn: () => base44.entities.Transfer.list('-created_date') });
   const { data: logs = [] } = useQuery({ queryKey: ['activity-logs'], queryFn: () => base44.entities.ActivityLog.list('-created_date', 200) });
+  const { data: variants = [] } = useQuery({ queryKey: ['variants'], queryFn: () => base44.entities.ProductVariant.list() });
+  const { data: releases = [] } = useQuery({ queryKey: ['warehouse-releases'], queryFn: () => base44.entities.WarehouseRelease.list('-created_date') });
 
   const filteredSales = useMemo(() =>
     sales.filter(s => s.status === 'completed' && s.sale_date >= dateFrom && s.sale_date <= dateTo),
@@ -117,6 +129,41 @@ export default function Reports() {
         return filteredTx.map(t => ({ Date: (t.created_at || '').slice(0, 10), Product: t.product_name, Warehouse: t.warehouse_name, Type: t.type, Reason: (t.reason || '').replace(/_/g, ' '), Qty: t.quantity }));
       case 'low_stock':
         return products.filter(p => { const qty = inventory.filter(i => i.product_id === p.id).reduce((s, i) => s + (i.quantity || 0), 0); return qty <= (p.min_stock_level || 0) && p.status === 'active'; }).map(p => { const qty = inventory.filter(i => i.product_id === p.id).reduce((s, i) => s + (i.quantity || 0), 0); return { Product: p.name, SKU: p.sku, 'Current Stock': qty, 'Min Level': p.min_stock_level, Shortage: p.min_stock_level - qty }; });
+      case 'variant_stock':
+        return variants.filter(v => !v.archived).map(v => {
+          const prod = products.find(p => p.id === v.product_id);
+          const qty = inventory.filter(i => i.variant_id === v.id).reduce((s, i) => s + (i.quantity || 0), 0);
+          return { Product: prod?.name || '', Variant: v.variant_name, SKU: v.sku, Barcode: v.barcode || '', Size: v.size || '', Color: v.color || '', Stock: qty, 'Sell Price': v.selling_price };
+        });
+      case 'reserved_stock':
+        return inventory.filter(i => (i.reserved_quantity || 0) > 0).map(i => ({ Product: i.product_name, Variant: i.variant_name || '', Warehouse: i.warehouse_name, Reserved: i.reserved_quantity, Total: i.quantity }));
+      case 'available_stock':
+        return inventory.map(i => ({ Product: i.product_name, Variant: i.variant_name || '', Warehouse: i.warehouse_name, Total: i.quantity, Reserved: i.reserved_quantity || 0, Available: (i.quantity || 0) - (i.reserved_quantity || 0) }));
+      case 'dead_stock': {
+        const ninetyAgo = new Date(Date.now() - 90 * 86400000).toISOString();
+        return inventory.filter(i => (i.quantity || 0) > 0).map(i => {
+          const lastTx = transactions.filter(t => t.product_id === i.product_id).map(t => t.created_at).sort().pop();
+          return { Product: i.product_name, Warehouse: i.warehouse_name, Stock: i.quantity, 'Last Movement': lastTx ? lastTx.slice(0, 10) : 'never', dead: !lastTx || lastTx < ninetyAgo };
+        }).filter(r => r.dead).map(({ dead, ...r }) => r);
+      }
+      case 'stock_aging':
+        return inventory.filter(i => (i.quantity || 0) > 0).map(i => {
+          const lastTx = transactions.filter(t => t.product_id === i.product_id).map(t => t.created_at).sort().pop();
+          const ageDays = lastTx ? Math.floor((Date.now() - new Date(lastTx)) / 86400000) : 999;
+          return { Product: i.product_name, Warehouse: i.warehouse_name, Stock: i.quantity, 'Age (days)': ageDays, Bucket: ageDays < 30 ? '0-30' : ageDays < 60 ? '30-60' : ageDays < 90 ? '60-90' : '90+' };
+        }).sort((a, b) => b['Age (days)'] - a['Age (days)']);
+      case 'warehouse_release':
+        return releases.filter(r => !r.archived).map(r => ({ Invoice: r.invoice_number, Customer: r.customer_name, Warehouse: r.warehouse_name, 'Pick Status': r.pick_status, 'Released By': r.released_by || '', Status: r.status, Date: r.release_date || (r.created_at || '').slice(0, 10) }));
+      case 'sales_release':
+        return sales.filter(s => ['pending_release', 'released', 'completed'].includes(s.workflow_status)).map(s => ({ Invoice: s.invoice_number, Customer: s.customer_name, 'Workflow Status': s.workflow_status, Total: s.total, Date: s.sale_date }));
+      case 'loss_making': {
+        const map = {};
+        variants.filter(v => !v.archived && v.selling_price > 0 && v.cost_price > 0 && v.selling_price < v.cost_price).forEach(v => {
+          const prod = products.find(p => p.id === v.product_id);
+          map[v.id] = { Product: prod?.name || '', Variant: v.variant_name, 'Cost Price': v.cost_price, 'Sell Price': v.selling_price, Loss: v.cost_price - v.selling_price };
+        });
+        return Object.values(map);
+      }
       case 'customer_credit':
         return customers.filter(c => (c.balance || 0) > 0).map(c => ({ Customer: c.name, Phone: c.phone || '', 'Credit Limit': c.credit_limit, 'Total Credit': c.total_credit, 'Total Paid': c.total_paid, 'Balance (ETB)': c.balance })).sort((a, b) => b['Balance (ETB)'] - a['Balance (ETB)']);
       case 'outstanding_balances':

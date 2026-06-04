@@ -50,7 +50,9 @@ const ENTITY_TABLE = {
   InventoryStock: 'inventory_stocks',
   Payment: 'payments',
   Product: 'products',
+  ProductVariant: 'product_variants',
   ProductCategory: 'product_categories',
+  WarehouseRelease: 'warehouse_releases',
   Sale: 'sales',
   SalesReturn: 'sales_returns',
   StockAdjustment: 'stock_adjustments',
@@ -408,6 +410,20 @@ export async function getSignedUrl(path, ttlSeconds = 3600) {
   const { data, error } = await supabase.storage.from('attachments').createSignedUrl(path, ttlSeconds);
   if (error) throw error;
   return data?.signedUrl;
+}
+
+// Upload a product/variant image to the PUBLIC product-images bucket.
+// Returns the permanent public URL (no expiry).
+export async function uploadProductImage(file, folder = 'products') {
+  if (!file) throw new Error('No file');
+  const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${folder}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from('product-images').upload(path, file, {
+    upsert: false,
+    contentType: file.type || undefined,
+  });
+  if (error) throw error;
+  return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
 }
 
 export const integrations = {

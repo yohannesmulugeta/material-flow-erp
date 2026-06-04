@@ -65,14 +65,20 @@ export default function NewSaleForm({ onBack }) {
         const unitCost = inv?.avg_cost_etb || 0;
         const lineTotal = item.quantity * item.unit_price;
         const lineCost = item.quantity * unitCost;
-        const lineProfit = lineTotal - lineCost;
         totalCost += lineCost;
         return {
           product_id: item.product_id, product_name: prod?.name || inv?.product_name || '',
           quantity: item.quantity, unit_price: item.unit_price, unit_cost: unitCost,
-          discount: 0, total: lineTotal, profit: lineProfit,
+          discount: 0, total: lineTotal, profit: lineTotal - lineCost,
         };
       });
+
+      // Validate against AVAILABLE stock (quantity - reserved)
+      for (const item of saleItems) {
+        const inv = warehouseInventory.find(i => i.product_id === item.product_id);
+        const avail = (inv?.quantity || 0) - (inv?.reserved_quantity || 0);
+        if (item.quantity > avail) throw new Error(`Only ${avail} available of ${item.product_name}`);
+      }
 
       const totalProfit = total - totalCost;
 
@@ -84,43 +90,42 @@ export default function NewSaleForm({ onBack }) {
         warehouse_name: warehouse?.name || '',
         sale_type: form.sale_type,
         items: saleItems,
-        subtotal,
-        discount: discountAmt,
-        tax: taxAmt,
-        total,
-        total_cost: totalCost,
-        total_profit: totalProfit,
-        paid_amount: form.sale_type === 'cash' ? total : 0,
-        status: 'completed',
+        subtotal, discount: discountAmt, tax: taxAmt, total,
+        total_cost: totalCost, total_profit: totalProfit,
+        paid_amount: 0,
+        status: 'pending',
+        workflow_status: 'pending_release',
         sale_date: form.sale_date,
         notes: form.notes,
       });
 
+      // RESERVE stock (do not deduct yet)
       for (const item of saleItems) {
         const inv = warehouseInventory.find(i => i.product_id === item.product_id);
         if (inv) {
-          const newQty = Math.max(0, (inv.quantity || 0) - item.quantity);
-          const newTotalValue = newQty * (inv.avg_cost_etb || 0);
-          await base44.entities.InventoryStock.update(inv.id, { quantity: newQty, total_value_etb: newTotalValue });
-          await base44.entities.StockTransaction.create({
-            product_id: item.product_id, product_name: item.product_name,
-            warehouse_id: form.warehouse_id, warehouse_name: warehouse?.name || '',
-            type: 'stock_out', reason: 'sale', quantity: item.quantity,
-            unit_cost_etb: item.unit_cost, reference_id: sale.id, reference_type: 'Sale',
+          await base44.entities.InventoryStock.update(inv.id, {
+            reserved_quantity: (inv.reserved_quantity || 0) + item.quantity,
           });
         }
       }
 
-      if (form.sale_type === 'credit' && form.customer_id && customer) {
-        await base44.entities.Customer.update(customer.id, {
-          total_credit: (customer.total_credit || 0) + total,
-          balance: (customer.balance || 0) + total,
-        });
-      }
+      // Create the Warehouse Release record (pending pick)
+      await base44.entities.WarehouseRelease.create({
+        sale_id: sale.id,
+        invoice_number: invoiceNum,
+        customer_name: customer?.name || 'Walk-in',
+        warehouse_id: form.warehouse_id,
+        warehouse_name: warehouse?.name || '',
+        items: JSON.stringify(saleItems),
+        pick_status: 'pending',
+        status: 'pending',
+        release_date: form.sale_date,
+      });
 
-      await logActivity({ module: 'Sale', action: 'created', entityType: 'Sale', entityId: sale.id, description: `Created ${form.sale_type} sale ${invoiceNum} for ETB ${fmt(total)}` });
+      await logActivity({ module: 'Sale', action: 'created', entityType: 'Sale', entityId: sale.id, description: `Created ${form.sale_type} sale ${invoiceNum} (ETB ${fmt(total)}) — stock reserved, pending warehouse release` });
     },
-    onSuccess: () => { qc.invalidateQueries(); onBack(); }
+    onSuccess: () => { qc.invalidateQueries(); onBack(); },
+    onError: (err) => alert(err.message),
   });
 
   return (
@@ -169,15 +174,18 @@ export default function NewSaleForm({ onBack }) {
                   <Select value={item.product_id} onValueChange={v => updateItem(idx, 'product_id', v)}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
-                      {warehouseInventory.filter(i => (i.quantity || 0) > 0).map(i => (
-                        <SelectItem key={i.product_id} value={i.product_id}>{i.product_name} ({i.quantity} avail)</SelectItem>
-                      ))}
+                      {warehouseInventory.filter(i => ((i.quantity || 0) - (i.reserved_quantity || 0)) > 0).map(i => {
+                        const av = (i.quantity || 0) - (i.reserved_quantity || 0);
+                        return <SelectItem key={i.product_id} value={i.product_id}>{i.product_name} ({av} available)</SelectItem>;
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="col-span-2">
-                  <Label className="text-xs">Qty{inv ? ` (max ${inv.quantity})` : ''}</Label>
-                  <Input type="number" min="1" max={inv?.quantity || 9999} value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} />
+                  {(() => { const av = inv ? (inv.quantity||0)-(inv.reserved_quantity||0) : null; return (
+                  <Label className="text-xs">Qty{av != null ? ` (max ${av})` : ''}</Label>
+                  ); })()}
+                  <Input type="number" min="1" max={inv ? (inv.quantity||0)-(inv.reserved_quantity||0) : 9999} value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} />
                 </div>
                 <div className="col-span-3">
                   <Label className="text-xs">Unit Price (ETB)</Label>
@@ -224,8 +232,11 @@ export default function NewSaleForm({ onBack }) {
         </div>
 
         <div><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+          Creating this sale will <strong>reserve</strong> the stock and send it to the Warehouse Release queue. Stock is only deducted after the warehouse picks the items and an admin gives final approval.
+        </div>
         <Button className="w-full" onClick={() => saveSale.mutate()} disabled={saveSale.isPending || items.length === 0 || !form.warehouse_id}>
-          {saveSale.isPending ? 'Processing...' : 'Complete Sale'}
+          {saveSale.isPending ? 'Processing...' : 'Create Sale & Reserve Stock'}
         </Button>
       </div>
     </div>

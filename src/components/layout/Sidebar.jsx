@@ -4,7 +4,8 @@ import {
   LayoutDashboard, Package, Warehouse, Ship, ShoppingCart,
   Users, Truck, ArrowLeftRight, AlertTriangle, Undo2,
   CreditCard, Building2, FileText, Activity, CheckSquare, SlidersHorizontal,
-  ChevronLeft, ChevronRight, LogOut, Moon, Sun, Menu, X, ShieldCheck, UserCog
+  ChevronLeft, ChevronRight, LogOut, Moon, Sun, Menu, X, ShieldCheck, UserCog,
+  TrendingUp, PackageCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -15,8 +16,10 @@ const NAV_ITEMS = [
   { path: '/products',          label: 'Products',         icon: Package,          module: 'products' },
   { path: '/warehouses',        label: 'Warehouses',       icon: Warehouse,        module: 'warehouses' },
   { path: '/inventory',         label: 'Inventory',        icon: Package,          module: 'inventory' },
+  { path: '/inventory-analytics', label: 'Inventory Analytics', icon: TrendingUp,  module: 'reports' },
   { path: '/containers',        label: 'Import Containers',icon: Ship,             module: 'containers' },
   { path: '/sales',             label: 'Sales',            icon: ShoppingCart,     module: 'sales' },
+  { path: '/warehouse-releases',label: 'Warehouse Release',icon: PackageCheck,     module: 'transfers' },
   { path: '/customers',         label: 'Customers',        icon: Users,            module: 'customers' },
   { path: '/suppliers',         label: 'Suppliers',        icon: Truck,            module: 'suppliers' },
   { path: '/transfers',         label: 'Transfers',        icon: ArrowLeftRight,   module: 'transfers' },

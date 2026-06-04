@@ -31,6 +31,9 @@ import Approvals from '@/pages/Approvals';
 import StockAdjustments from '@/pages/StockAdjustments';
 import DataAudit from '@/pages/DataAudit';
 import Users from '@/pages/Users';
+import InventoryDetail from '@/pages/InventoryDetail';
+import WarehouseReleases from '@/pages/WarehouseReleases';
+import InventoryAnalytics from '@/pages/InventoryAnalytics';
 
 function App() {
   return (
@@ -51,6 +54,10 @@ function App() {
                 <Route path="/products" element={<Products />} />
                 <Route path="/warehouses" element={<Warehouses />} />
                 <Route path="/inventory" element={<Inventory />} />
+              <Route path="/inventory/:productId" element={<InventoryDetail />} />
+              <Route path="/inventory/:productId/:variantId" element={<InventoryDetail />} />
+              <Route path="/inventory-analytics" element={<InventoryAnalytics />} />
+              <Route path="/warehouse-releases" element={<WarehouseReleases />} />
                 <Route path="/containers" element={<Containers />} />
                 <Route path="/sales" element={<Sales />} />
                 <Route path="/customers" element={<Customers />} />
