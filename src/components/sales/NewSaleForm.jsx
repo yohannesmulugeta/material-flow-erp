@@ -14,7 +14,8 @@ export default function NewSaleForm({ onBack }) {
   const qc = useQueryClient();
   const [form, setForm] = useState({
     sale_type: 'cash', customer_id: '', warehouse_id: '', discount_pct: 0, tax: 0, notes: '',
-    sale_date: format(new Date(), 'yyyy-MM-dd')
+    sale_date: format(new Date(), 'yyyy-MM-dd'),
+    quick_complete: false,   // skip release workflow — deduct stock immediately (cash counter sales)
   });
   const [items, setItems] = useState([]);
 
@@ -81,6 +82,7 @@ export default function NewSaleForm({ onBack }) {
       }
 
       const totalProfit = total - totalCost;
+      const quick = form.quick_complete;
 
       const sale = await base44.entities.Sale.create({
         invoice_number: invoiceNum,
@@ -92,37 +94,64 @@ export default function NewSaleForm({ onBack }) {
         items: saleItems,
         subtotal, discount: discountAmt, tax: taxAmt, total,
         total_cost: totalCost, total_profit: totalProfit,
-        paid_amount: 0,
-        status: 'pending',
-        workflow_status: 'pending_release',
+        paid_amount: (quick && form.sale_type === 'cash') ? total : 0,
+        status: quick ? 'completed' : 'pending',
+        workflow_status: quick ? 'completed' : 'pending_release',
         sale_date: form.sale_date,
+        completed_at: quick ? new Date().toISOString() : undefined,
         notes: form.notes,
       });
 
-      // RESERVE stock (do not deduct yet)
-      for (const item of saleItems) {
-        const inv = warehouseInventory.find(i => i.product_id === item.product_id);
-        if (inv) {
-          await base44.entities.InventoryStock.update(inv.id, {
-            reserved_quantity: (inv.reserved_quantity || 0) + item.quantity,
-          });
+      if (quick) {
+        // ── Quick cash sale: deduct stock immediately, no release queue ──
+        for (const item of saleItems) {
+          const inv = warehouseInventory.find(i => i.product_id === item.product_id);
+          if (inv) {
+            const newQty = Math.max(0, (inv.quantity || 0) - item.quantity);
+            await base44.entities.InventoryStock.update(inv.id, {
+              quantity: newQty,
+              total_value_etb: newQty * (inv.avg_cost_etb || 0),
+            });
+            await base44.entities.StockTransaction.create({
+              product_id: item.product_id, product_name: item.product_name,
+              warehouse_id: form.warehouse_id, warehouse_name: warehouse?.name || '',
+              type: 'stock_out', reason: 'sale', quantity: item.quantity,
+              unit_cost_etb: item.unit_cost, reference_id: sale.id, reference_type: 'Sale',
+            });
+          }
         }
+        await logActivity({ module: 'Sale', action: 'created', entityType: 'Sale', entityId: sale.id, description: `Quick cash sale ${invoiceNum} (ETB ${fmt(total)}) — completed, stock deducted` });
+      } else {
+        // ── Standard flow: reserve stock + create warehouse release ──
+        for (const item of saleItems) {
+          const inv = warehouseInventory.find(i => i.product_id === item.product_id);
+          if (inv) {
+            await base44.entities.InventoryStock.update(inv.id, {
+              reserved_quantity: (inv.reserved_quantity || 0) + item.quantity,
+            });
+          }
+        }
+        await base44.entities.WarehouseRelease.create({
+          sale_id: sale.id,
+          invoice_number: invoiceNum,
+          customer_name: customer?.name || 'Walk-in',
+          warehouse_id: form.warehouse_id,
+          warehouse_name: warehouse?.name || '',
+          items: JSON.stringify(saleItems),
+          pick_status: 'pending',
+          status: 'pending',
+          release_date: form.sale_date,
+        });
+        await logActivity({ module: 'Sale', action: 'created', entityType: 'Sale', entityId: sale.id, description: `Created ${form.sale_type} sale ${invoiceNum} (ETB ${fmt(total)}) — stock reserved, pending warehouse release` });
       }
 
-      // Create the Warehouse Release record (pending pick)
-      await base44.entities.WarehouseRelease.create({
-        sale_id: sale.id,
-        invoice_number: invoiceNum,
-        customer_name: customer?.name || 'Walk-in',
-        warehouse_id: form.warehouse_id,
-        warehouse_name: warehouse?.name || '',
-        items: JSON.stringify(saleItems),
-        pick_status: 'pending',
-        status: 'pending',
-        release_date: form.sale_date,
-      });
-
-      await logActivity({ module: 'Sale', action: 'created', entityType: 'Sale', entityId: sale.id, description: `Created ${form.sale_type} sale ${invoiceNum} (ETB ${fmt(total)}) — stock reserved, pending warehouse release` });
+      // Credit sale → update customer balance (both paths)
+      if (form.sale_type === 'credit' && form.customer_id && customer) {
+        await base44.entities.Customer.update(customer.id, {
+          total_credit: (customer.total_credit || 0) + total,
+          balance: (customer.balance || 0) + total,
+        });
+      }
     },
     onSuccess: () => { qc.invalidateQueries(); onBack(); },
     onError: (err) => alert(err.message),
@@ -232,11 +261,28 @@ export default function NewSaleForm({ onBack }) {
         </div>
 
         <div><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-          Creating this sale will <strong>reserve</strong> the stock and send it to the Warehouse Release queue. Stock is only deducted after the warehouse picks the items and an admin gives final approval.
+        {/* Quick-complete toggle (cash counter sales) */}
+        <label className="flex items-start gap-3 rounded-xl border border-border p-3 cursor-pointer hover:bg-muted/30 transition-colors">
+          <input
+            type="checkbox"
+            className="mt-0.5 w-4 h-4 accent-primary"
+            checked={form.quick_complete}
+            onChange={e => setForm({ ...form, quick_complete: e.target.checked })}
+          />
+          <div>
+            <p className="text-sm font-medium">Quick complete (counter sale)</p>
+            <p className="text-xs text-muted-foreground">Deduct stock immediately and finish the sale now — skips the warehouse release queue. Best for walk-in cash sales handed over at the counter.</p>
+          </div>
+        </label>
+
+        <div className={`rounded-lg p-3 text-sm border ${form.quick_complete ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+          {form.quick_complete
+            ? <>This sale will <strong>complete immediately</strong> and stock will be deducted right away.</>
+            : <>This sale will <strong>reserve</strong> stock and go to the Warehouse Release queue. Stock is deducted after picking and admin approval.</>}
         </div>
+
         <Button className="w-full" onClick={() => saveSale.mutate()} disabled={saveSale.isPending || items.length === 0 || !form.warehouse_id}>
-          {saveSale.isPending ? 'Processing...' : 'Create Sale & Reserve Stock'}
+          {saveSale.isPending ? 'Processing…' : form.quick_complete ? 'Complete Sale Now' : 'Create Sale & Reserve Stock'}
         </Button>
       </div>
     </div>
