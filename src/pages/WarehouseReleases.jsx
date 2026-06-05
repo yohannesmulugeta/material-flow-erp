@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,30 +59,17 @@ export default function WarehouseReleases() {
     },
   });
 
-  // Admin final approval → deduct stock from reserved + total, complete the sale
+  // Admin final approval → atomic, race-safe deduction in the database.
+  // The release_and_deduct RPC (single transaction with row locks) validates
+  // physical + reserved stock, deducts quantity & reserved_quantity, inserts the
+  // stock_transactions, and marks the release + sale completed. The browser no
+  // longer does any of that math.
   const approve = useMutation({
     mutationFn: async (r) => {
-      const items = parseItems(r);
-      for (const item of items) {
-        const inv = inventory.find(i => i.product_id === item.product_id && i.warehouse_id === r.warehouse_id);
-        if (inv) {
-          const newQty = Math.max(0, (inv.quantity || 0) - item.quantity);
-          const newReserved = Math.max(0, (inv.reserved_quantity || 0) - item.quantity);
-          await base44.entities.InventoryStock.update(inv.id, {
-            quantity: newQty,
-            reserved_quantity: newReserved,
-            total_value_etb: newQty * (inv.avg_cost_etb || 0),
-          });
-          await base44.entities.StockTransaction.create({
-            product_id: item.product_id, product_name: item.product_name,
-            warehouse_id: r.warehouse_id, warehouse_name: r.warehouse_name,
-            type: 'stock_out', reason: 'sale', quantity: item.quantity,
-            unit_cost_etb: item.unit_cost, reference_id: r.sale_id, reference_type: 'Sale',
-          });
-        }
-      }
-      await base44.entities.WarehouseRelease.update(r.id, { status: 'approved', approved_by: user?.full_name || user?.email, approved_at: new Date().toISOString() });
-      await base44.entities.Sale.update(r.sale_id, { workflow_status: 'completed', status: 'completed', completed_at: new Date().toISOString() });
+      const { error } = await supabase.rpc('release_and_deduct', { p_release_id: r.id });
+      if (error) throw error;
+      // Audit log is NOT written by the RPC — keep it here so the action trail
+      // stays complete. (Does not duplicate any RPC side-effect.)
       await logActivity({ module: 'WarehouseRelease', action: 'approved', entityType: 'WarehouseRelease', entityId: r.id, description: `Final approval & stock deducted for ${r.invoice_number}` });
     },
     onSuccess: () => qc.invalidateQueries(),
