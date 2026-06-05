@@ -95,7 +95,8 @@ export function hasPermission(role, module, action) {
   // Map built-in platform roles to ERP roles
   const effectiveRole = role === 'admin' ? 'super_admin' : role;
   const perms = ROLE_PERMISSIONS[effectiveRole];
-  if (!perms) return true; // Unknown roles get full access (fallback)
+  // Deny by default: unknown, typo, null, or unassigned roles get NO access.
+  if (!perms) return false;
   if (typeof perms[module] === 'boolean') return perms[module];
   if (typeof perms[module] === 'object') return perms[module][action] || false;
   return false;
