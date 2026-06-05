@@ -15,6 +15,7 @@ import DataTable from '@/components/ui/DataTable';
 import StatusBadge from '@/components/ui/StatusBadge';
 import AuditTrail from '@/components/ui/AuditTrail';
 import { logActivity } from '@/lib/activityLogger';
+import { toast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'manager', 'accountant'];
@@ -56,7 +57,11 @@ export default function Payments() {
       }
       await logActivity({ module: 'Payment', action: 'created', entityType: 'Payment', description: `Received ETB ${fmt(data.amount)} from ${reference?.name}` });
     },
-    onSuccess: () => { qc.invalidateQueries(); setOpen(false); }
+    onSuccess: () => { qc.invalidateQueries(); setOpen(false); },
+    onError: (err) => {
+      console.error('Payment save failed:', err);
+      toast({ variant: 'destructive', title: 'Payment could not be saved', description: 'Please try again or contact admin.' });
+    },
   });
 
   // REQUEST EDIT (non-admin) or DIRECT EDIT (admin)
@@ -81,7 +86,11 @@ export default function Payments() {
         await logActivity({ module: 'Payment', action: 'edit_requested', entityType: 'Payment', entityId: editing.id, description: `Edit requested for payment ${editing.reference_name}` });
       }
     },
-    onSuccess: () => { qc.invalidateQueries(); setEditOpen(false); setEditing(null); setEditReason(''); }
+    onSuccess: () => { qc.invalidateQueries(); setEditOpen(false); setEditing(null); setEditReason(''); },
+    onError: (err) => {
+      console.error('Payment edit request failed:', err);
+      toast({ variant: 'destructive', title: 'Could not submit edit request', description: 'Please try again or contact admin.' });
+    },
   });
 
   // REQUEST DELETE (non-admin) or SOFT DELETE (admin)
@@ -103,7 +112,11 @@ export default function Payments() {
         await logActivity({ module: 'Payment', action: 'delete_requested', entityType: 'Payment', entityId: payment.id, description: `Delete requested for payment ${payment.reference_name}` });
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['payments'] })
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payments'] }),
+    onError: (err) => {
+      console.error('Payment delete request failed:', err);
+      toast({ variant: 'destructive', title: 'Could not submit request', description: 'Please try again or contact admin.' });
+    },
   });
 
   const openEdit = (p) => {

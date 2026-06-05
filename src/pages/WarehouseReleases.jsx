@@ -14,6 +14,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { printReleaseSlip } from '@/components/warehouse/ReleaseSlip';
 import { logActivity } from '@/lib/activityLogger';
+import { toast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 
 const ADMIN = ['super_admin', 'admin', 'manager'];
@@ -52,6 +53,10 @@ export default function WarehouseReleases() {
       await logActivity({ module: 'WarehouseRelease', action: 'picked', entityType: 'WarehouseRelease', entityId: active.id, description: `Items picked for ${active.invoice_number} by ${pickForm.released_by}` });
     },
     onSuccess: () => { qc.invalidateQueries(); setPickOpen(false); setActive(null); },
+    onError: (err) => {
+      console.error('Record pick failed:', err);
+      toast({ variant: 'destructive', title: 'Could not record pick', description: 'Please try again or contact admin.' });
+    },
   });
 
   // Admin final approval → deduct stock from reserved + total, complete the sale
@@ -81,6 +86,10 @@ export default function WarehouseReleases() {
       await logActivity({ module: 'WarehouseRelease', action: 'approved', entityType: 'WarehouseRelease', entityId: r.id, description: `Final approval & stock deducted for ${r.invoice_number}` });
     },
     onSuccess: () => qc.invalidateQueries(),
+    onError: (err) => {
+      console.error('Release approval failed:', err);
+      toast({ variant: 'destructive', title: 'Approval failed', description: 'Please try again or contact admin.' });
+    },
   });
 
   const reject = useMutation({
@@ -96,6 +105,10 @@ export default function WarehouseReleases() {
       await logActivity({ module: 'WarehouseRelease', action: 'rejected', entityType: 'WarehouseRelease', entityId: r.id, description: `Release rejected for ${r.invoice_number}, reservation released` });
     },
     onSuccess: () => qc.invalidateQueries(),
+    onError: (err) => {
+      console.error('Release rejection failed:', err);
+      toast({ variant: 'destructive', title: 'Rejection failed', description: 'Please try again or contact admin.' });
+    },
   });
 
   function openPick(r) {

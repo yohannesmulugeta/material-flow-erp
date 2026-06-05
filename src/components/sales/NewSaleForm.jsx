@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { logActivity } from '@/lib/activityLogger';
+import { toast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 
 export default function NewSaleForm({ onBack }) {
@@ -154,7 +155,10 @@ export default function NewSaleForm({ onBack }) {
       }
     },
     onSuccess: () => { qc.invalidateQueries(); onBack(); },
-    onError: (err) => alert(err.message),
+    onError: (err) => {
+      console.error('Sale save failed:', err);
+      toast({ variant: 'destructive', title: 'Sale could not be saved', description: 'Please try again or contact admin.' });
+    },
   });
 
   return (
