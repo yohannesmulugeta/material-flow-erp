@@ -103,16 +103,22 @@ export default function Approvals() {
   // Damage approval
   const approveDamage = useMutation({
     mutationFn: async (record) => {
-      const inv = inventory.find(i => i.product_id === record.product_id && i.warehouse_id === record.warehouse_id);
-      if (inv) {
-        const newQty = Math.max(0, (inv.quantity || 0) - record.quantity);
-        await base44.entities.InventoryStock.update(inv.id, { quantity: newQty, total_value_etb: newQty * (inv.avg_cost_etb || 0) });
-        await base44.entities.StockTransaction.create({ product_id: record.product_id, product_name: record.product_name, warehouse_id: record.warehouse_id, warehouse_name: record.warehouse_name, type: 'stock_out', reason: record.type, quantity: record.quantity, reference_id: record.id, reference_type: 'DamageRecord' });
-      }
-      await base44.entities.DamageRecord.update(record.id, { status: 'approved' });
+      // Atomic, race-safe damage/loss approval in the database: deducts the
+      // damaged quantity, writes the stock_transaction, and marks the record
+      // approved — all in one transaction with row locks and a state guard.
+      // Replaces the browser read-modify-write, which used Math.max(0, ...) and
+      // silently floored shortages to 0. The RPC now BLOCKS approval when stock
+      // is insufficient instead of clamping.
+      const { error } = await supabase.rpc('approve_damage', { p_damage_id: record.id });
+      if (error) throw error;
+      // Audit log is not written by the RPC — keep it here (no duplication).
       await logActivity({ module: 'Damage', action: 'approved', entityType: 'DamageRecord', entityId: record.id, description: `Approved ${record.type}: ${record.product_name}` });
     },
-    onSuccess: () => qc.invalidateQueries()
+    onSuccess: () => qc.invalidateQueries(),
+    onError: (err) => {
+      console.error('Damage approval failed:', err);
+      toast({ variant: 'destructive', title: 'Damage approval failed', description: 'Please try again or contact admin.' });
+    },
   });
 
   const rejectDamage = useMutation({
