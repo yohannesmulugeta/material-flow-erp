@@ -47,28 +47,23 @@ export default function Approvals() {
   // Transfer approval
   const approveTransfer = useMutation({
     mutationFn: async (transfer) => {
-      const srcInv = inventory.find(i => i.product_id === transfer.product_id && i.warehouse_id === transfer.source_warehouse_id);
-      if (!srcInv || srcInv.quantity < transfer.quantity) throw new Error('Insufficient stock');
-      const newSrcQty = srcInv.quantity - transfer.quantity;
-      await base44.entities.InventoryStock.update(srcInv.id, { quantity: newSrcQty, total_value_etb: newSrcQty * (srcInv.avg_cost_etb || 0) });
-      const destInv = inventory.find(i => i.product_id === transfer.product_id && i.warehouse_id === transfer.destination_warehouse_id);
-      if (destInv) {
-        const newDestQty = (destInv.quantity || 0) + transfer.quantity;
-        await base44.entities.InventoryStock.update(destInv.id, { quantity: newDestQty, total_value_etb: newDestQty * (srcInv.avg_cost_etb || 0) });
-      } else {
-        await base44.entities.InventoryStock.create({
-          product_id: transfer.product_id, product_name: transfer.product_name,
-          warehouse_id: transfer.destination_warehouse_id, warehouse_name: transfer.destination_warehouse_name,
-          quantity: transfer.quantity, avg_cost_etb: srcInv.avg_cost_etb || 0,
-          total_value_etb: transfer.quantity * (srcInv.avg_cost_etb || 0),
-        });
-      }
-      await base44.entities.StockTransaction.create({ product_id: transfer.product_id, product_name: transfer.product_name, warehouse_id: transfer.source_warehouse_id, warehouse_name: transfer.source_warehouse_name, type: 'stock_out', reason: 'transfer_out', quantity: transfer.quantity, reference_id: transfer.id, reference_type: 'Transfer' });
-      await base44.entities.StockTransaction.create({ product_id: transfer.product_id, product_name: transfer.product_name, warehouse_id: transfer.destination_warehouse_id, warehouse_name: transfer.destination_warehouse_name, type: 'stock_in', reason: 'transfer_in', quantity: transfer.quantity, reference_id: transfer.id, reference_type: 'Transfer' });
-      await base44.entities.Transfer.update(transfer.id, { status: 'completed' });
+      // Atomic, race-safe transfer in the database: deducts source quantity,
+      // adds/creates the destination row, writes the stock_out + stock_in pair,
+      // and marks the transfer completed — all in ONE transaction with row locks,
+      // an advisory lock (prevents A->B / B->A deadlocks), a pending-only state
+      // guard, and reserved-stock protection. Replaces the browser's 5 separate
+      // read-modify-write calls, which could leave a partial state (stock moved
+      // out of source but never added to destination).
+      const { error } = await supabase.rpc('approve_transfer', { p_transfer_id: transfer.id });
+      if (error) throw error;
+      // Audit log is not written by the RPC — keep it here (no duplication).
       await logActivity({ module: 'Transfer', action: 'approved', entityType: 'Transfer', entityId: transfer.id, description: `Approved transfer: ${transfer.product_name} x${transfer.quantity}` });
     },
-    onSuccess: () => qc.invalidateQueries()
+    onSuccess: () => qc.invalidateQueries(),
+    onError: (err) => {
+      console.error('Transfer approval failed:', err);
+      toast({ variant: 'destructive', title: 'Transfer approval failed', description: 'Please try again or contact admin.' });
+    },
   });
 
   const rejectTransfer = useMutation({
