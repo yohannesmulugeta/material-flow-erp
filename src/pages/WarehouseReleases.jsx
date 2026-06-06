@@ -81,14 +81,12 @@ export default function WarehouseReleases() {
 
   const reject = useMutation({
     mutationFn: async (r) => {
-      // release the reservation back
-      const items = parseItems(r);
-      for (const item of items) {
-        const inv = inventory.find(i => i.product_id === item.product_id && i.warehouse_id === r.warehouse_id);
-        if (inv) await base44.entities.InventoryStock.update(inv.id, { reserved_quantity: Math.max(0, (inv.reserved_quantity || 0) - item.quantity) });
-      }
-      await base44.entities.WarehouseRelease.update(r.id, { status: 'rejected' });
-      await base44.entities.Sale.update(r.sale_id, { workflow_status: 'cancelled', status: 'cancelled' });
+      // Atomic, race-safe rejection in the database: frees the reserved stock,
+      // marks the release 'rejected', and cancels the sale — all in one
+      // transaction with row locks and state guards. Replaces the browser loop.
+      const { error } = await supabase.rpc('reject_release', { p_release_id: r.id });
+      if (error) throw error;
+      // Audit log is not written by the RPC — keep it here (no duplication).
       await logActivity({ module: 'WarehouseRelease', action: 'rejected', entityType: 'WarehouseRelease', entityId: r.id, description: `Release rejected for ${r.invoice_number}, reservation released` });
     },
     onSuccess: () => qc.invalidateQueries(),
