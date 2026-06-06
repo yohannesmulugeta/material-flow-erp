@@ -1,0 +1,21 @@
+-- ============================================================================
+-- Allow variant-level inventory rows
+--
+-- Drops the obsolete unique index `inventory_stocks_pw_uidx` on
+-- (product_id, warehouse_id). That index pre-dates product variants and makes
+-- it impossible to store more than one inventory row per product per warehouse,
+-- which blocks variant-level stock (e.g. Shoe size 40 vs size 41 in the same
+-- warehouse).
+--
+-- SAFE because the newer index already enforces correct uniqueness:
+--   inventory_stocks_pvw_uidx ON (product_id, COALESCE(variant_id,
+--     '00000000-0000-0000-0000-000000000000'::uuid), warehouse_id)
+-- A NULL variant_id coalesces to the zero-uuid, so two non-variant
+-- (variant_id IS NULL) rows for the same product+warehouse still collide on
+-- that index — duplicate non-variant rows remain impossible. Distinct variants
+-- (different variant_id) are now allowed, as intended.
+--
+-- Data is NOT touched. Only the redundant/over-restrictive index is removed.
+-- ============================================================================
+
+drop index if exists public.inventory_stocks_pw_uidx;
