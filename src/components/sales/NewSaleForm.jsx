@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -123,15 +123,16 @@ export default function NewSaleForm({ onBack }) {
         }
         await logActivity({ module: 'Sale', action: 'created', entityType: 'Sale', entityId: sale.id, description: `Quick cash sale ${invoiceNum} (ETB ${fmt(total)}) — completed, stock deducted` });
       } else {
-        // ── Standard flow: reserve stock + create warehouse release ──
-        for (const item of saleItems) {
-          const inv = warehouseInventory.find(i => i.product_id === item.product_id);
-          if (inv) {
-            await base44.entities.InventoryStock.update(inv.id, {
-              reserved_quantity: (inv.reserved_quantity || 0) + item.quantity,
-            });
-          }
-        }
+        // ── Standard flow: reserve stock (atomic RPC) + create warehouse release ──
+        // reserve_stock locks the inventory rows, validates availability
+        // (quantity - reserved) server-side, and increments reserved_quantity in
+        // one transaction — replacing the old browser read-modify-write loop.
+        const { error: reserveError } = await supabase.rpc('reserve_stock', {
+          p_warehouse_id: form.warehouse_id,
+          p_items: saleItems,
+        });
+        if (reserveError) throw reserveError;
+
         await base44.entities.WarehouseRelease.create({
           sale_id: sale.id,
           invoice_number: invoiceNum,
