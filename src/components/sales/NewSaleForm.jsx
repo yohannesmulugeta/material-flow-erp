@@ -104,23 +104,18 @@ export default function NewSaleForm({ onBack }) {
       });
 
       if (quick) {
-        // ── Quick cash sale: deduct stock immediately, no release queue ──
-        for (const item of saleItems) {
-          const inv = warehouseInventory.find(i => i.product_id === item.product_id);
-          if (inv) {
-            const newQty = Math.max(0, (inv.quantity || 0) - item.quantity);
-            await base44.entities.InventoryStock.update(inv.id, {
-              quantity: newQty,
-              total_value_etb: newQty * (inv.avg_cost_etb || 0),
-            });
-            await base44.entities.StockTransaction.create({
-              product_id: item.product_id, product_name: item.product_name,
-              warehouse_id: form.warehouse_id, warehouse_name: warehouse?.name || '',
-              type: 'stock_out', reason: 'sale', quantity: item.quantity,
-              unit_cost_etb: item.unit_cost, reference_id: sale.id, reference_type: 'Sale',
-            });
-          }
-        }
+        // ── Quick cash sale: deduct stock immediately (atomic RPC), no release queue ──
+        // quick_sale_deduct locks the inventory rows, validates physical stock,
+        // deducts quantity, recomputes total_value_etb, and writes one
+        // stock_transactions row per item — all in one transaction. It does NOT
+        // touch reserved_quantity (quick sales never reserve).
+        const { error: deductError } = await supabase.rpc('quick_sale_deduct', {
+          p_warehouse_id: form.warehouse_id,
+          p_sale_id: sale.id,
+          p_items: saleItems,
+        });
+        if (deductError) throw deductError;
+
         await logActivity({ module: 'Sale', action: 'created', entityType: 'Sale', entityId: sale.id, description: `Quick cash sale ${invoiceNum} (ETB ${fmt(total)}) — completed, stock deducted` });
       } else {
         // ── Standard flow: reserve stock (atomic RPC) + create warehouse release ──
