@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { base44 } from '@/api/base44Client';
+import { base44, supabase } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Check, X, ArrowLeftRight, Undo2, AlertTriangle, SlidersHorizontal, Cred
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { logActivity } from '@/lib/activityLogger';
+import { toast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 
 function ApprovalRow({ label, detail, date, onApprove, onReject, loading }) {
@@ -78,16 +79,20 @@ export default function Approvals() {
   // Return approval
   const approveReturn = useMutation({
     mutationFn: async (ret) => {
-      const inv = inventory.find(i => i.product_id === ret.product_id && i.warehouse_id === ret.warehouse_id);
-      if (inv) {
-        const newQty = (inv.quantity || 0) + ret.quantity;
-        await base44.entities.InventoryStock.update(inv.id, { quantity: newQty, total_value_etb: newQty * (inv.avg_cost_etb || 0) });
-      }
-      await base44.entities.StockTransaction.create({ product_id: ret.product_id, product_name: ret.product_name, warehouse_id: ret.warehouse_id, type: 'stock_in', reason: 'return', quantity: ret.quantity, reference_id: ret.id, reference_type: 'SalesReturn' });
-      await base44.entities.SalesReturn.update(ret.id, { status: 'approved' });
+      // Atomic, race-safe return approval in the database: adds returned stock
+      // (creating the inventory row if missing), writes the stock_transaction,
+      // and marks the return approved — all in one transaction with row locks
+      // and a state guard. Replaces the browser read-modify-write.
+      const { error } = await supabase.rpc('approve_return', { p_return_id: ret.id });
+      if (error) throw error;
+      // Audit log is not written by the RPC — keep it here (no duplication).
       await logActivity({ module: 'Return', action: 'approved', entityType: 'SalesReturn', entityId: ret.id, description: `Approved return: ${ret.product_name}` });
     },
-    onSuccess: () => qc.invalidateQueries()
+    onSuccess: () => qc.invalidateQueries(),
+    onError: (err) => {
+      console.error('Return approval failed:', err);
+      toast({ variant: 'destructive', title: 'Return approval failed', description: 'Please try again or contact admin.' });
+    },
   });
 
   const rejectReturn = useMutation({
